@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: 2010-09-09
+  
+Description: etcd cluster
+
+Resources:
+
+  ##
+  # Create VPC
+  ##
+  EtcdVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.250.0.0/24
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: etcd-cluster
+
+  ##
+  # Create and Attach an Internet Gateway
+  ##
+  EtcdInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: etcd-cluster
+
+  ProdInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref EtcdVpc
+      InternetGatewayId: !Ref EtcdInternetGateway
+
+  ##
+  # Create Controllers Subnets
+  ##
+  EtcdSubnet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref EtcdVpc
+      AvailabilityZone: "us-east-1a"
+      CidrBlock: 10.250.0.0/28
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: etcd-cluster-1a
+
+  EtcdSubnet1b:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref EtcdVpc
+      AvailabilityZone: "us-east-1b"
+      CidrBlock: 10.250.0.16/28
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: etcd-cluster-1b
+
+  EtcdSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref EtcdVpc
+      AvailabilityZone: "us-east-1c"
+      CidrBlock: 10.250.0.32/28
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: etcd-cluster-1c
+
+  ##
+  # Create Route Table
+  ##
+  EtcdRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref EtcdVpc
+      Tags:
+      - Key: Name
+        Value: etcd-cluster
+
+  ##
+  # Create Route Table Associations
+  ##
+  EtcdSubnet1aRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EtcdSubnet1a
+      RouteTableId: !Ref EtcdRouteTable
+
+  EtcdSubnet1bRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EtcdSubnet1b
+      RouteTableId: !Ref EtcdRouteTable
+
+  EtcdSubnet1cRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EtcdSubnet1c
+      RouteTableId: !Ref EtcdRouteTable
+
+  ##
+  # Create Route to access the Internet
+  ##
+  EtcdRoute:
+    Type: AWS::EC2::Route
+    DependsOn: EtcdInternetGateway
+    Properties:
+       RouteTableId: !Ref EtcdRouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId: !Ref EtcdInternetGateway
+
+  ##
+  # Create Security Group for controllers
+  ##
+  EtcdSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref EtcdVpc
+      GroupDescription: "Allow internal traffic"
+      GroupName: "etcd-cluster"
+      Tags:
+        - Key: Name
+          Value: etcd-cluster
+
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2379
+          ToPort: 2380
+          CidrIp: 10.250.0.0/28
+
+        - IpProtocol: tcp
+          FromPort: 2379
+          ToPort: 2380
+          CidrIp: 10.250.0.16/28
+
+        - IpProtocol: tcp
+          FromPort: 2379
+          ToPort: 2380
+          CidrIp: 10.250.0.32/28
+
+        # SSH
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 181.230.195.209/32
+
+  ##
+  # Network Load Balancer
+  ##
+  EtcdLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${AWS::StackName}-nlb"
+      IpAddressType: ipv4
+      Scheme: internal
+      Subnets:
+        - !Ref EtcdSubnet1a
+        - !Ref EtcdSubnet1b
+        - !Ref EtcdSubnet1c
+      Type: network
+
+  EtcdTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AWS::StackName}-tg"
+      VpcId: !Ref EtcdVpc
+      Port: 2379
+      Protocol: TCP
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 80
+      HealthCheckPath: /health
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      HealthCheckIntervalSeconds: 10
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 30
+        - Key: deregistration_delay.connection_termination.enabled
+          Value: true
+      TargetType: instance
+
+  EtcdListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref EtcdTargetGroup
+      LoadBalancerArn: !Ref EtcdLoadBalancer
+      Port: 2379
+      Protocol: TCP

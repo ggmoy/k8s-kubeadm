@@ -1,0 +1,13 @@
+[Unit]
+Description=etcd
+Requires=etcd-init.service
+After=etcd-init.service
+
+[Service]
+Type=notify
+LimitNOFILE=40000
+TimeoutStartSec=0
+ExecStart=/usr/local/bin/etcd --config-file /run/etcd.conf
+
+[Install]
+WantedBy=multi-user.target

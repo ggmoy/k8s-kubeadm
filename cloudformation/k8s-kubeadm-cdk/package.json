@@ -1,0 +1,21 @@
+{
+  "name": "k8s-kubeadm-cdk",
+  "version": "0.1.0",
+  "bin": {
+    "k8s-kubeadm-cdk": "bin/k8s-kubeadm-cdk.js"
+  },
+  "scripts": {
+    "build": "echo \"The build step is not required when using JavaScript!\" && exit 0",
+    "cdk": "cdk",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@aws-cdk/assert": "1.92.0",
+    "aws-cdk": "1.92.0",
+    "jest": "^26.4.2"
+  },
+  "dependencies": {
+    "@aws-cdk/aws-ec2": "^1.92.0",
+    "@aws-cdk/core": "1.92.0"
+  }
+}

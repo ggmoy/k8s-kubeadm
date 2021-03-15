@@ -1,0 +1,321 @@
+AWSTemplateFormatVersion: 2010-09-09
+  
+Description: Kubernetes cluster created with kubeadm
+
+Resources:
+
+  ##
+  # Create VPC
+  ##
+  K8sVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.240.0.0/24
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: k8s-kubeadm-cluster
+
+  ##
+  # Create and Attach an Internet Gateway
+  ##
+  K8sInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: k8s-kubeadm-cluster
+
+  K8sInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref K8sVpc
+      InternetGatewayId: !Ref K8sInternetGateway
+
+  ##
+  # Create Controllers Subnets
+  ##
+  K8sControllersSubnet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref K8sVpc
+      AvailabilityZone: "us-east-1a"
+      CidrBlock: 10.240.0.0/28
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: k8s-kubeadm-cluster
+
+  K8sControllersSubnet1b:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref K8sVpc
+      AvailabilityZone: "us-east-1b"
+      CidrBlock: 10.240.0.16/28
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: k8s-kubeadm-cluster
+
+  K8sControllersSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref K8sVpc
+      AvailabilityZone: "us-east-1c"
+      CidrBlock: 10.240.0.32/28
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: k8s-kubeadm-cluster
+
+  ##
+  # Create Workerss Subnets
+  ##
+  K8sWorkersSubnet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref K8sVpc
+      AvailabilityZone: "us-east-1a"
+      CidrBlock: 10.240.0.48/28
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: k8s-kubeadm-cluster
+
+  K8sWorkersSubnet1b:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref K8sVpc
+      AvailabilityZone: "us-east-1b"
+      CidrBlock: 10.240.0.64/28
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: k8s-kubeadm-cluster
+
+  K8sWorkersSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref K8sVpc
+      AvailabilityZone: "us-east-1c"
+      CidrBlock: 10.240.0.80/28
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: k8s-kubeadm-cluster
+
+  ##
+  # Create Route Table
+  ##
+  K8sRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref K8sVpc
+      Tags:
+      - Key: Name
+        Value: k8s-kubeadm-cluster
+
+  ##
+  # Create Route Table Associations
+  ##
+  K8sControllersSubnet1aRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref K8sControllersSubnet1a
+      RouteTableId: !Ref K8sRouteTable
+
+  K8sControllersSubnet1bRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref K8sControllersSubnet1b
+      RouteTableId: !Ref K8sRouteTable
+
+  K8sControllersSubnet1cRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref K8sControllersSubnet1c
+      RouteTableId: !Ref K8sRouteTable
+
+  K8sWorkersSubnet1aRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref K8sWorkersSubnet1a
+      RouteTableId: !Ref K8sRouteTable
+
+  K8sWorkersSubnet1bRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref K8sWorkersSubnet1b
+      RouteTableId: !Ref K8sRouteTable
+
+  K8sWorkersSubnet1cRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref K8sWorkersSubnet1c
+      RouteTableId: !Ref K8sRouteTable
+
+  ##
+  # Create Route to access the Internet
+  ##
+  K8sRoute:
+    Type: AWS::EC2::Route
+    DependsOn: K8sInternetGateway
+    Properties:
+       RouteTableId: !Ref K8sRouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId: !Ref K8sInternetGateway
+
+  ##
+  # Create Security Group for controllers
+  ##
+  K8sControllersSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref K8sVpc
+      GroupDescription: "Allow internal traffic"
+      GroupName: "k8s-kubeadm-cluster-controllers"
+      Tags:
+        - Key: Name
+          Value: k8s-kubeadm-cluster-controllers
+
+      SecurityGroupIngress:
+
+        ##
+        # This one is REALLY important to allow Calico IP-in-IP traffic (IPIP).
+        # Without this rule, connectivity between pods in different subnets
+        # where not working. For example, when I connected to pod1 and ping
+        # pod2, it didn't work until I connect to pod2 and also ping pod1.
+        #
+        # Ref1: https://github.com/projectcalico/calico/issues/1357
+        # Ref2: https://github.com/projectcalico/calico/issues/1996
+        ##
+        - IpProtocol: 4
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 10.240.0.0/28
+
+        - IpProtocol: 4
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 10.240.0.16/28
+
+        - IpProtocol: 4
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 10.240.0.32/28
+
+        ##
+        # Purpose: Kubernetes API server
+        # Used By: All
+        ##
+        - IpProtocol: tcp
+          FromPort: 6443
+          ToPort: 6443
+          CidrIp: 10.240.0.0/28
+
+        - IpProtocol: tcp
+          FromPort: 6443
+          ToPort: 6443
+          CidrIp: 10.240.0.16/28
+
+        - IpProtocol: tcp
+          FromPort: 6443
+          ToPort: 6443
+          CidrIp: 10.240.0.32/28
+
+        ##
+        # Purpose: etcd server client API
+        # Used By: kube-apiserver, etcd
+        ##
+        - IpProtocol: tcp
+          FromPort: 2379
+          ToPort: 2380
+          CidrIp: 10.240.0.0/28
+
+        - IpProtocol: tcp
+          FromPort: 2379
+          ToPort: 2380
+          CidrIp: 10.240.0.16/28
+
+        - IpProtocol: tcp
+          FromPort: 2379
+          ToPort: 2380
+          CidrIp: 10.240.0.32/28
+
+        ##
+        # Purpose: kubelet API
+        # Used By: Self, Control plane
+        ##
+        - IpProtocol: tcp
+          FromPort: 10250
+          ToPort: 10250
+          CidrIp: 10.240.0.0/28
+
+        - IpProtocol: tcp
+          FromPort: 10250
+          ToPort: 10250
+          CidrIp: 10.240.0.16/28
+
+        - IpProtocol: tcp
+          FromPort: 10250
+          ToPort: 10250
+          CidrIp: 10.240.0.32/28
+
+        ##
+        # Purpose: kube-scheduler
+        # Used By: Self
+        ##
+        - IpProtocol: tcp
+          FromPort: 10251
+          ToPort: 10251
+          CidrIp: 10.240.0.0/28
+
+        - IpProtocol: tcp
+          FromPort: 10251
+          ToPort: 10251
+          CidrIp: 10.240.0.16/28
+
+        - IpProtocol: tcp
+          FromPort: 10251
+          ToPort: 10251
+          CidrIp: 10.240.0.32/28
+
+        ##
+        # Purpose: kube-controller-manager
+        # Used By: Self
+        ##
+        - IpProtocol: tcp
+          FromPort: 10252
+          ToPort: 10252
+          CidrIp: 10.240.0.0/28
+
+        - IpProtocol: tcp
+          FromPort: 10252
+          ToPort: 10252
+          CidrIp: 10.240.0.16/28
+
+        - IpProtocol: tcp
+          FromPort: 10252
+          ToPort: 10252
+          CidrIp: 10.240.0.32/28
+
+        ##
+        # SSH
+        ##
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 181.230.195.209/32
+
+#        - IpProtocol: udp
+#          FromPort: 0
+#          ToPort: 65535
+#          CidrIp: 10.240.0.0/24
+#
+#        - IpProtocol: icmp
+#          FromPort: -1
+#          ToPort: -1
+#          CidrIp: 10.240.0.0/24
+

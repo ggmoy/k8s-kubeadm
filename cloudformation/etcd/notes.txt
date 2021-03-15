@@ -1,0 +1,31 @@
+# Endpoints health
+ETCDCTL_API=3 test-etcd/etcdctl \
+    --endpoints etcd-1.esc-dev.com:2379,etcd-2.esc-dev.com:2379,etcd-3.esc-dev.com:2379 \
+    --cacert ${HOME}/certs/etcd-root-ca.pem \
+    --cert ${HOME}/certs/etcd-1.pem \
+    --key ${HOME}/certs/etcd-1-key.pem \
+    endpoint health
+
+# List members
+ETCDCTL_API=3 test-etcd/etcdctl \
+    --endpoints etcd-1.esc-dev.com:2379 \
+    --cacert ${HOME}/certs/etcd-root-ca.pem \
+    --cert ${HOME}/certs/etcd-1.pem \
+    --key ${HOME}/certs/etcd-1-key.pem \
+    member list
+
+# Remove member
+ETCDCTL_API=3 test-etcd/etcdctl \
+    --endpoints etcd-1.esc-dev.com:2379 \
+    --cacert ${HOME}/certs/etcd-root-ca.pem \
+    --cert ${HOME}/certs/etcd-1.pem \
+    --key ${HOME}/certs/etcd-1-key.pem \
+    member remove b43125bc9a0c8e3c
+
+# Add member
+ETCDCTL_API=3 test-etcd/etcdctl \
+    --endpoints etcd-1.esc-dev.com:2379 \
+    --cacert ${HOME}/certs/etcd-root-ca.pem \
+    --cert ${HOME}/certs/etcd-1.pem \
+    --key ${HOME}/certs/etcd-1-key.pem \
+    member add etcd-3 --peer-urls=https://etcd-3.esc-dev.com:2380

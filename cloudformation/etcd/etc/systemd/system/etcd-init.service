@@ -1,0 +1,9 @@
+[Unit]
+Description=etd init step
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/etcd-init.sh
+
+[Install]
+WantedBy=multi-user.target
