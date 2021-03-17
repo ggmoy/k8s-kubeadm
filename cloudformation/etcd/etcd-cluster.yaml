@@ -192,3 +192,30 @@ Resources:
       LoadBalancerArn: !Ref EtcdLoadBalancer
       Port: 2379
       Protocol: TCP
+
+  ##
+  # Launch Template
+  ##
+  EtcdLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${AWS::StackName}-lt"
+      LaunchTemplateData:
+#        IamInstanceProfile:
+#          Arn: !GetAtt
+#            - MyIamInstanceProfile
+#            - Arn
+        ImageId: ami-08e64196a1045d6e4
+        InstanceType: t3a.small
+        KeyName: key-gmoyano-4.0.0-public-key.pub
+        SecurityGroupIds:
+          - !Ref EtcdSecurityGroup
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Ref AWS::StackName
+          - ResourceType: volume
+            Tags:
+              - Key: Name
+                Value: !Ref AWS::StackName

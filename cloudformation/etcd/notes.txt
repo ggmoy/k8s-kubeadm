@@ -29,3 +29,36 @@ ETCDCTL_API=3 test-etcd/etcdctl \
     --cert ${HOME}/certs/etcd-1.pem \
     --key ${HOME}/certs/etcd-1-key.pem \
     member add etcd-3 --peer-urls=https://etcd-3.esc-dev.com:2380
+
+################################
+# Who is the leader in TABLE format
+################################
+ETCDCTL_API=3 etcdctl -w table \
+    --endpoints etcd.esc-dev.com:2379 \
+    --cacert /etc/etcd/ssl/certs/etcd-root-ca.pem \
+    --cert /etc/etcd/ssl/certs/$INSTANCE_ID.pem \
+    --key /etc/etcd/ssl/private/$INSTANCE_ID-key.pem \
+    endpoint status --cluster
+
++--------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|         ENDPOINT         |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++--------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| https://10.250.0.22:2379 | 28bd52f1a427c74f |  3.4.15 |   20 kB |     false |      false |         4 |      98356 |              98356 |        |
+| https://10.250.0.14:2379 | 80fdd45c31e81690 |  3.4.15 |   25 kB |     false |      false |         4 |      98356 |              98356 |        |
+|  https://10.250.0.9:2379 | b5f1ebb0d0bbb11a |  3.4.15 |   20 kB |      true |      false |         4 |      98356 |              98356 |        |
++--------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+
+#############################################
+# Who is the leader not table format        #
+#############################################
+ETCDCTL_API=3 etcdctl \
+    --endpoints etcd.esc-dev.com:2379 \
+    --cacert /etc/etcd/ssl/certs/etcd-root-ca.pem \
+    --cert /etc/etcd/ssl/certs/$INSTANCE_ID.pem \
+    --key /etc/etcd/ssl/private/$INSTANCE_ID-key.pem \
+    endpoint status --cluster
+
+https://10.250.0.22:2379, 28bd52f1a427c74f, 3.4.15, 20 kB, false, false, 4, 99025, 99025, 
+https://10.250.0.14:2379, 80fdd45c31e81690, 3.4.15, 25 kB, false, false, 4, 99025, 99025, 
+https://10.250.0.9:2379, b5f1ebb0d0bbb11a, 3.4.15, 20 kB, true, false, 4, 99025, 99025, 
+
