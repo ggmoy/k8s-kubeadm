@@ -10,10 +10,13 @@
 #    - Get lock
 #    - Check if the amount of healthy members is at least 2. Otherwise, exit(1)
 #    - Delete unhealthy members
-#    - 
+#    - Check if this node is part of the cluster and remove it
+#    - Add this node to the cluster
+#    - Create initial-cluster string
 #
 ################################################################################
 import os
+import re
 import sys
 import json
 import subprocess
@@ -60,6 +63,9 @@ def get_unhealthy_members():
 # Check if a member is healthy
 ##
 def is_member_healthy(member):
+    if member['status'] == 'unstarted':
+        return False
+
     p = subprocess.Popen(
         [
             "etcdctl",
@@ -67,6 +73,23 @@ def is_member_healthy(member):
             "health",
             "--endpoints",
             member['client_addrs']
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+
+    return True if p.wait() == 0 else False
+
+##
+# Return True is succeeded of False if failed
+##
+def etcd_add_member(member):
+    p = subprocess.Popen(
+        [
+            "etcdctl", "--endpoints", "https://etcd.esc-dev.com:2379",
+            "member", "add",
+            member['name'],
+            "--peer-urls={}".format(member['peer_addrs'])
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
@@ -115,6 +138,7 @@ def remove_unhealthy_members():
 
     print("[INFO]: Removing unhealthy members")
     for member in unhealthy_members:
+        print(json.dumps(member, indent=4))
         if etcd_remove_member(member):
             print("[INFO]: Member {} has been removed".format(member))
         else:
@@ -124,6 +148,8 @@ def remove_unhealthy_members():
 ################################################################################
 # Code starts here                                                             #
 ################################################################################
+
+os.unsetenv('ETCDCTL_ENDPOINTS')
 
 print("[INFO]: Checking the amount of healthy members")
 healthy_members = get_healthy_members()
@@ -150,13 +176,37 @@ if len(unhealthy_members) > 0:
     if failed:
         sys.exit(1)
 
-#for member in get_members_list():
-#    if is_member_healthy(member):
-#        print('member {} is healthy'.format(member['name']))
-#        continue
-#
-#    if etcd_remove_member(member):
-#        print('member {} has been removed'.format(member['name']))
-#    else:
-#        print('member {} has NOT been removed'.format(member['name']))
-##print(json.dumps(get_healthy_members(), indent=4))
+print("[INFO]: Removing this node from the cluster")
+for member in healthy_members:
+    if not (member['name'] == os.environ['INSTANCE_ID'] or
+            re.match('.*{}'.format(os.environ['LOCAL_IPV4']), member['peer_addrs'])):
+        continue
+
+    if etcd_remove_member(member):
+        print("[INFO]: Member {} has been removed".format(member['name']))
+        break
+    else:
+        print("[ERROR]: Member {} could not be removed".format(member['name']))
+        sys.exit(1)
+
+print("[INFO]: Adding member {} to the cluster".format(os.environ['INSTANCE_ID']))
+if etcd_add_member({
+    'name': os.environ['INSTANCE_ID'],
+    'peer_addrs': 'https://{}:2380'.format(os.environ['LOCAL_IPV4'])
+}):
+    print("[INFO]: Member {} has been added to the cluster".format(member['name']))
+else:
+    print("[ERROR]: Member {} could not be added to the cluster".format(member['name']))
+    sys.exit(1)
+
+print("[INFO]: Updating etcd config file")
+with open('/etc/etcd/etcd.conf.tmpl', 'r') as in_file:
+    with open('/etc/etcd/etcd.conf', 'w') as out_file:
+        initial_cluster = ','.join(['{}={}'.format(member['name'], member['peer_addrs']) for member in healthy_members])
+        initial_cluster += ',{}=https://{}:2380'.format(os.environ['INSTANCE_ID'], os.environ['LOCAL_IPV4'])
+        for line in in_file:
+            line = line.replace('INSTANCE_ID', os.environ['INSTANCE_ID'])
+            line = line.replace('LOCAL_IPV4', os.environ['LOCAL_IPV4'])
+            line = line.replace('INITIAL_CLUSTER_STATE', 'existing')
+            line = line.replace('INITIAL_CLUSTER', initial_cluster)
+            out_file.write(line)

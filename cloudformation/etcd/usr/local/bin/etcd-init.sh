@@ -1,8 +1,15 @@
 #!/bin/bash
 
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-LOCAL_HOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
-LOCAL_IPV4=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+export LOCAL_HOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
+export LOCAL_IPV4=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+
+export ETCDCTL_API=3
+export ETCDCTL_CACERT=/etc/etcd/ssl/certs/etcd-root-ca.pem
+export ETCDCTL_CERT=/etc/etcd/ssl/certs/$INSTANCE_ID.pem
+export ETCDCTL_KEY=/etc/etcd/ssl/private/$INSTANCE_ID-key.pem
+export ETCDCTL_DIAL_TIMEOUT=3s
+export ETCDCTL_ENDPOINTS=https://etcd.esc-dev.com:2379
 
 SSL_DIR=/etc/etcd/ssl
 
@@ -47,6 +54,7 @@ cat > $SSL_DIR/$INSTANCE_ID-ca-csr.json <<EOF
   "CN": "$INSTANCE_ID",
   "hosts": [
     "$LOCAL_IPV4",
+    "$LOCAL_HOSTNAME",
     "etcd.esc-dev.com"
   ]
 }
@@ -62,6 +70,7 @@ mv $SSL_DIR/certs/$INSTANCE_ID-key.pem $SSL_DIR/private/
 
 # verify
 #openssl x509 -in $SSL_DIR/certs/$INSTANCE_ID.pem -text -noout
+
 
 ##
 # Check if we are bootstraping the cluster
@@ -102,56 +111,15 @@ then
         initial_cluster+="${healthy_instance_ids[$i]}=https://${instance_ip}:2380"
     done
 
-    cat <<EOF > /run/etcd.conf
-name: $INSTANCE_ID
+    cp /etc/etcd/etcd.conf.tmpl /etc/etcd/etcd.conf
+    sed -i "s/INSTANCE_ID/$INSTANCE_ID/g" /etc/etcd/etcd.conf
+    sed -i "s/LOCAL_IPV4/$LOCAL_IPV4/g" /etc/etcd/etcd.conf
+    sed -i "s/INITIAL_CLUSTER_STATE/$INITIAL_CLUSTER_STATE/g" /etc/etcd/etcd.conf
+    sed -i "s|INITIAL_CLUSTER|$initial_cluster|g" /etc/etcd/etcd.conf
 
-data-dir: /tmp/etcd
-
-listen-client-urls: https://0.0.0.0:2379
-advertise-client-urls: https://$LOCAL_IPV4:2379
-
-listen-peer-urls: https://0.0.0.0:2380
-initial-advertise-peer-urls: https://$LOCAL_IPV4:2380
-
-# Initial cluster configuration for bootstrapping.
-initial-cluster: $initial_cluster
-
-# Initial cluster token for the etcd cluster during bootstrap.
-initial-cluster-token: etcd-cluster
-
-# Initial cluster state ('new' or 'existing').
-initial-cluster-state: $INITIAL_CLUSTER_STATE
-
-# Health checks to port 80 to avoid AWS ELB errors.
-listen-metrics-urls: http://$LOCAL_IPV4:80
-
-client-transport-security:
-    # Enable client cert authentication.
-    client-cert-auth: true
-
-    # Path to the client server TLS cert file.
-    cert-file: /etc/etcd/ssl/certs/$INSTANCE_ID.pem
-
-    # Path to the client server TLS key file.
-    key-file: /etc/etcd/ssl/private/$INSTANCE_ID-key.pem
-
-    # Path to the client server TLS cert file.
-    trusted-ca-file: /etc/etcd/ssl/certs/etcd-root-ca.pem
-
-peer-transport-security:
-    # Enable peer client cert authentication.
-    client-cert-auth: true
-
-    # Path to the peer server TLS cert file.
-    cert-file: /etc/etcd/ssl/certs/$INSTANCE_ID.pem
-
-    # Path to the peer server TLS key file.
-    key-file: /etc/etcd/ssl/private/$INSTANCE_ID-key.pem
-
-    # Path to the peer server TLS trusted CA cert file.
-    trusted-ca-file: /etc/etcd/ssl/certs/etcd-root-ca.pem
-EOF
-
+elif [[ $INITIAL_CLUSTER_STATE = "existing" ]]
+then
+    etcdctl lock add_node /usr/bin/python3 /usr/local/bin/etcd-pre-start.py
 fi
 
 rm -Rf /tmp/etcd
