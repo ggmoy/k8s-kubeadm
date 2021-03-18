@@ -14,6 +14,14 @@
 #    - Add this node to the cluster
 #    - Create initial-cluster string
 #
+# TODO:
+#
+#    - Add a cron job in charge of removing unhealthy members. It has to check
+#      the amount of healthy members in the cluster before doing anything.
+#
+#    - The etcd-pre-start.py script should terminate if there are unhealty
+#      members. Then, it will retry until the cron job do the clean up.
+#
 ################################################################################
 import os
 import re
