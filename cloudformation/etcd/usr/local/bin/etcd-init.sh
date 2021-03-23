@@ -120,6 +120,10 @@ then
 elif [[ $INITIAL_CLUSTER_STATE = "existing" ]]
 then
     etcdctl lock add_node /usr/bin/python3 /usr/local/bin/etcd-pre-start.py
+    if [ $? -ne 0 ]
+    then
+        exit 1
+    fi
 fi
 
 rm -Rf /tmp/etcd

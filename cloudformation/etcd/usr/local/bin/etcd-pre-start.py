@@ -27,6 +27,7 @@ import os
 import re
 import sys
 import json
+import time
 import subprocess
 
 ##
@@ -172,36 +173,42 @@ unhealthy_members = get_unhealthy_members()
 print("[INFO]: There are {} unhealthy members".format(len(unhealthy_members)))
 
 if len(unhealthy_members) > 0:
-    print("[INFO]: Removing unhealthy members")
+    print("[ERROR]: There are unhealthy members. Can't not start. Exiting ...")
+    sys.exit(1)
 
-    failed = False
-    for member in unhealthy_members:
-        if etcd_remove_member(member):
-            print("[INFO]: Member {} has been removed".format(member['name']))
-        else:
-            print("[ERROR]: Member {} could not be removed".format(member['name']))
-            failed = True
-    if failed:
-        sys.exit(1)
+#if len(unhealthy_members) > 0:
+#    print("[INFO]: Removing unhealthy members")
+#
+#    failed = False
+#    for member in unhealthy_members:
+#        if etcd_remove_member(member):
+#            print("[INFO]: Member {} has been removed".format(member['name']))
+#        else:
+#            print("[ERROR]: Member {} could not be removed".format(member['name']))
+#            failed = True
+#    if failed:
+#        sys.exit(1)
 
-print("[INFO]: Removing this node from the cluster")
-for member in healthy_members:
-    if not (member['name'] == os.environ['INSTANCE_ID'] or
-            re.match('.*{}'.format(os.environ['LOCAL_IPV4']), member['peer_addrs'])):
-        continue
+#print("[INFO]: Removing this node from the cluster")
+#for member in healthy_members:
+#    if not (member['name'] == os.environ['INSTANCE_ID'] or
+#            re.match('.*{}'.format(os.environ['LOCAL_IPV4']), member['peer_addrs'])):
+#        continue
+#
+#    if etcd_remove_member(member):
+#        print("[INFO]: Member {} has been removed".format(member['name']))
+#        break
+#    else:
+#        print("[ERROR]: Member {} could not be removed".format(member['name']))
+#        sys.exit(1)
 
-    if etcd_remove_member(member):
-        print("[INFO]: Member {} has been removed".format(member['name']))
-        break
-    else:
-        print("[ERROR]: Member {} could not be removed".format(member['name']))
-        sys.exit(1)
-
-print("[INFO]: Adding member {} to the cluster".format(os.environ['INSTANCE_ID']))
-if etcd_add_member({
+member = {
     'name': os.environ['INSTANCE_ID'],
     'peer_addrs': 'https://{}:2380'.format(os.environ['LOCAL_IPV4'])
-}):
+}
+
+print("[INFO]: Adding member {} to the cluster".format(os.environ['INSTANCE_ID']))
+if etcd_add_member(member):
     print("[INFO]: Member {} has been added to the cluster".format(member['name']))
 else:
     print("[ERROR]: Member {} could not be added to the cluster".format(member['name']))
