@@ -1,0 +1,32 @@
+The files in this directory where downloaded from:
+=================================================
+
+annotations.proto   ->  https://github.com/googleapis/googleapis/blob/master/google/api/annotations.proto
+
+auth.proto          ->  https://github.com/etcd-io/etcd/blob/master/api/authpb/auth.proto
+
+descriptor.proto    ->  https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/descriptor.proto
+
+http.proto          ->  https://github.com/googleapis/googleapis/blob/master/google/api/http.proto
+
+kv.proto            ->  https://github.com/etcd-io/etcd/blob/master/api/mvccpb/kv.proto
+
+rpc.proto           ->  https://github.com/etcd-io/etcd/blob/master/api/etcdserverpb/rpc.proto
+
+
+Config environment
+==================
+
+$ apt install build-essential dkms linux-headers-$(uname -r)
+$ apt install python3-dev
+$ apt install python3-venv
+$ python3 -m venv venv
+$ source venv/bin/activate
+$ python -m pip install --upgrade wheel
+$ python -m pip install grpcio-tools
+
+
+Compile
+=======
+
+python -m grpc_tools.protoc -I ../protobufs --python_out=. --grpc_python_out=. ../protobufs/rpc.proto
