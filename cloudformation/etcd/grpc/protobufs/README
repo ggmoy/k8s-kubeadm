@@ -1,17 +1,17 @@
 The files in this directory where downloaded from:
 =================================================
 
-annotations.proto   ->  https://github.com/googleapis/googleapis/blob/master/google/api/annotations.proto
+annotations.proto   ->  https://raw.githubusercontent.com/googleapis/googleapis/master/google/api/annotations.proto
 
-auth.proto          ->  https://github.com/etcd-io/etcd/blob/master/api/authpb/auth.proto
+auth.proto          ->  https://raw.githubusercontent.com/etcd-io/etcd/master/api/authpb/auth.proto
 
-descriptor.proto    ->  https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/descriptor.proto
+descriptor.proto    ->  https://raw.githubusercontent.com/protocolbuffers/protobuf/master/src/google/protobuf/descriptor.proto
 
-http.proto          ->  https://github.com/googleapis/googleapis/blob/master/google/api/http.proto
+http.proto          ->  https://raw.githubusercontent.com/googleapis/googleapis/master/google/api/http.proto
 
-kv.proto            ->  https://github.com/etcd-io/etcd/blob/master/api/mvccpb/kv.proto
+kv.proto            ->  https://raw.githubusercontent.com/etcd-io/etcd/master/api/mvccpb/kv.proto
 
-rpc.proto           ->  https://github.com/etcd-io/etcd/blob/master/api/etcdserverpb/rpc.proto
+rpc.proto           ->  https://raw.githubusercontent.com/etcd-io/etcd/master/api/etcdserverpb/rpc.proto
 
 
 Config environment
